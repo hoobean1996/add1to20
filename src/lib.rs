@@ -1,4 +1,6 @@
 use libc::{mmap, mprotect, MAP_ANONYMOUS, MAP_PRIVATE, PROT_EXEC, PROT_READ, PROT_WRITE};
+use std::fs::File;
+use std::io::{Result, Write};
 use std::mem;
 
 use std::collections::{HashMap, VecDeque};
@@ -153,7 +155,7 @@ impl VirtualMachine {
             0xc3, // ret
         ]);
 
-        self.print_buffer_hex(&buffer);
+        self.write_buffer_hex_to_file(&buffer, "adder");
 
         let size = buffer.len();
 
@@ -185,17 +187,23 @@ impl VirtualMachine {
         ptr as *const i32
     }
 
-    fn print_buffer_hex(&mut self, buffer: &[u8]) {
+    fn write_buffer_hex_to_file(&mut self, buffer: &[u8], filename: &str) -> Result<()> {
+        let mut file = File::create(filename)?;
+        let mut output = String::new();
+
         for (i, &byte) in buffer.iter().enumerate() {
             if i % 16 == 0 {
                 if i > 0 {
-                    println!();
+                    output.push('\n');
                 }
-                print!("{:04x}: ", i);
+                output.push_str(&format!("{:04x}: ", i));
             }
-            print!("{:02x} ", byte);
+            output.push_str(&format!("{:02x} ", byte));
         }
-        println!();
+        output.push('\n');
+
+        file.write_all(output.as_bytes())?;
+        Ok(())
     }
 
     fn aot_literal(&mut self) -> *const i32 {
@@ -321,7 +329,8 @@ mod tests {
 
     #[test]
     pub fn test_bytecode_aot() {
-        let mut vm = VirtualMachine::new(VecDeque::from(vec![Push(5), Push(3), Add, Store, Halt]));
-        assert_eq!(vm.run_with_aot(), Some(8));
+        let mut vm =
+            VirtualMachine::new(VecDeque::from(vec![Push(123), Push(12), Add, Store, Halt]));
+        assert_eq!(vm.run_with_aot(), Some(135));
     }
 }
